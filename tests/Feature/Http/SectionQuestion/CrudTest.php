@@ -184,4 +184,271 @@ class CrudTest extends TestCase
 
         $this->assertDatabaseMissing('section_questions', ['id' => $question->id]);
     }
+
+    public function test_assigned_coach_can_view_section_questions(): void
+    {
+        $coach = User::factory()->coach()->create();
+
+        $certX = Certification::factory()->published()->create();
+        $certY = Certification::factory()->published()->create();
+
+        $this->assignCoach($coach, $certX);
+
+        [, , $sectionX] = $this->makePartChain($certX);
+        [, , $sectionY] = $this->makePartChain($certY);
+
+        $this->actingAs($coach)
+            ->get(route('admin.sections.questions.index', $sectionX))
+            ->assertOk();
+
+        $this->actingAs($coach)
+            ->get(route('admin.sections.questions.index', $sectionY))
+            ->assertForbidden();
+    }
+
+    public function test_assigned_coach_can_create_question_only_in_assigned_certification(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $certX = Certification::factory()->published()->create();
+        $certY = Certification::factory()->published()->create();
+
+        $this->assignCoach($coach, $certX);
+
+        [, , $sectionX] = $this->makePartChain($certX);
+        [, , $sectionY] = $this->makePartChain($certY);
+
+        $categoryX = $this->makeCategory($certX);
+        $categoryY = $this->makeCategory($certY);
+
+        // 担当資格Xには作成できる
+        $this->actingAs($coach)
+            ->post(route('admin.sections.questions.store', $sectionX), [
+                'body' => '担当資格の問題',
+                'category_id' => $categoryX->id,
+                'options' => [
+                    ['body' => '正解', 'is_correct' => true, 'order' => 0],
+                    ['body' => '不正解', 'is_correct' => false, 'order' => 1],
+                ],
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('section_questions', [
+            'section_id' => $sectionX->id,
+            'body' => '担当資格の問題',
+        ]);
+
+        // 担当外資格Yには作成できない
+        $this->actingAs($coach)
+            ->post(route('admin.sections.questions.store', $sectionY), [
+                'body' => '担当外の問題',
+                'category_id' => $categoryY->id,
+                'options' => [
+                    ['body' => '正解', 'is_correct' => true, 'order' => 0],
+                    ['body' => '不正解', 'is_correct' => false, 'order' => 1],
+                ],
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('section_questions', [
+            'section_id' => $sectionY->id,
+            'body' => '担当外の問題',
+        ]);
+    }
+
+    public function test_assigned_coach_can_update_question_only_in_assigned_certification(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $certX = Certification::factory()->published()->create();
+        $certY = Certification::factory()->published()->create();
+
+        $this->assignCoach($coach, $certX);
+
+        [, , $sectionX] = $this->makePartChain($certX);
+        [, , $sectionY] = $this->makePartChain($certY);
+
+        $categoryX = $this->makeCategory($certX);
+        $categoryY = $this->makeCategory($certY);
+
+        $questionX = SectionQuestion::factory()
+            ->forSection($sectionX)
+            ->forCategory($categoryX)
+            ->withOptions(4)
+            ->draft()
+            ->create(['body' => '更新前X']);
+
+        $questionY = SectionQuestion::factory()
+            ->forSection($sectionY)
+            ->forCategory($categoryY)
+            ->withOptions(4)
+            ->draft()
+            ->create(['body' => '更新前Y']);
+
+        // 担当資格Xの問題は更新できる
+        $this->actingAs($coach)
+            ->patch(route('admin.section-questions.update', $questionX), [
+                'body' => '更新後X',
+                'category_id' => $categoryX->id,
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('section_questions', [
+            'id' => $questionX->id,
+            'body' => '更新後X',
+        ]);
+
+        // 担当外資格Yの問題は更新できない
+        $this->actingAs($coach)
+            ->patch(route('admin.section-questions.update', $questionY), [
+                'body' => '不正更新',
+                'category_id' => $categoryY->id,
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('section_questions', [
+            'id' => $questionY->id,
+            'body' => '更新前Y',
+        ]);
+    }
+
+    public function test_assigned_coach_can_delete_question_only_in_assigned_certification(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $certX = Certification::factory()->published()->create();
+        $certY = Certification::factory()->published()->create();
+
+        $this->assignCoach($coach, $certX);
+
+        [, , $sectionX] = $this->makePartChain($certX);
+        [, , $sectionY] = $this->makePartChain($certY);
+
+        $categoryX = $this->makeCategory($certX);
+        $categoryY = $this->makeCategory($certY);
+
+        $questionX = SectionQuestion::factory()
+            ->forSection($sectionX)
+            ->forCategory($categoryX)
+            ->draft()
+            ->create();
+
+        $questionY = SectionQuestion::factory()
+            ->forSection($sectionY)
+            ->forCategory($categoryY)
+            ->draft()
+            ->create();
+
+        // 担当資格Xの問題は削除できる
+        $this->actingAs($coach)
+            ->delete(route('admin.section-questions.destroy', $questionX))
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('section_questions', [
+            'id' => $questionX->id,
+        ]);
+
+        // 担当外資格Yの問題は削除できない
+        $this->actingAs($coach)
+            ->delete(route('admin.section-questions.destroy', $questionY))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('section_questions', [
+            'id' => $questionY->id,
+        ]);
+    }
+
+    public function test_assigned_coach_can_publish_question_only_in_assigned_certification(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $certX = Certification::factory()->published()->create();
+        $certY = Certification::factory()->published()->create();
+
+        $this->assignCoach($coach, $certX);
+
+        [, , $sectionX] = $this->makePartChain($certX);
+        [, , $sectionY] = $this->makePartChain($certY);
+
+        $categoryX = $this->makeCategory($certX);
+        $categoryY = $this->makeCategory($certY);
+
+        $questionX = SectionQuestion::factory()
+            ->forSection($sectionX)
+            ->forCategory($categoryX)
+            ->withOptions(4)
+            ->draft()
+            ->create();
+
+        $questionY = SectionQuestion::factory()
+            ->forSection($sectionY)
+            ->forCategory($categoryY)
+            ->withOptions(4)
+            ->draft()
+            ->create();
+
+        // 担当資格Xの問題は公開できる
+        $this->actingAs($coach)
+            ->post(route('admin.section-questions.publish', $questionX))
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('section_questions', [
+            'id' => $questionX->id,
+            'status' => 'published',
+        ]);
+
+        // 担当外資格Yの問題は公開できない
+        $this->actingAs($coach)
+            ->post(route('admin.section-questions.publish', $questionY))
+            ->assertForbidden();
+
+        // 担当外資格Yの問題は下書きのまま
+        $this->assertDatabaseHas('section_questions', [
+            'id' => $questionY->id,
+            'status' => 'draft',
+        ]);
+    }
+
+    public function test_assigned_coach_can_unpublish_question_only_in_assigned_certification(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $certX = Certification::factory()->published()->create();
+        $certY = Certification::factory()->published()->create();
+
+        $this->assignCoach($coach, $certX);
+
+        [, , $sectionX] = $this->makePartChain($certX);
+        [, , $sectionY] = $this->makePartChain($certY);
+
+        $categoryX = $this->makeCategory($certX);
+        $categoryY = $this->makeCategory($certY);
+
+        $questionX = SectionQuestion::factory()
+            ->forSection($sectionX)
+            ->forCategory($categoryX)
+            ->published()
+            ->create();
+
+        $questionY = SectionQuestion::factory()
+            ->forSection($sectionY)
+            ->forCategory($categoryY)
+            ->published()
+            ->create();
+
+        // 担当資格Xの問題は非公開にできる
+        $this->actingAs($coach)
+            ->post(route('admin.section-questions.unpublish', $questionX))
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('section_questions', [
+            'id' => $questionX->id,
+            'status' => 'draft',
+        ]);
+
+        // 担当外資格Yの問題は非公開にできない
+        $this->actingAs($coach)
+            ->post(route('admin.section-questions.unpublish', $questionY))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('section_questions', [
+            'id' => $questionY->id,
+            'status' => 'published',
+        ]);
+    }
 }

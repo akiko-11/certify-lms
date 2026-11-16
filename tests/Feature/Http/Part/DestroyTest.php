@@ -8,11 +8,12 @@ use App\Models\Certification;
 use App\Models\Part;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\ContentTestHelpers;
 use Tests\TestCase;
 
 class DestroyTest extends TestCase
 {
-    use RefreshDatabase;
+    use ContentTestHelpers, RefreshDatabase;
 
     public function test_admin_can_soft_delete_draft_part(): void
     {
@@ -38,5 +39,42 @@ class DestroyTest extends TestCase
             ->assertStatus(409);
 
         $this->assertDatabaseHas('parts', ['id' => $part->id]);
+    }
+
+    public function test_assigned_coach_can_delete_part_only_in_assigned_certification(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $certX = Certification::factory()->published()->create();
+        $certY = Certification::factory()->published()->create();
+
+        $this->assignCoach($coach, $certX);
+
+        $partX = Part::factory()
+            ->forCertification($certX)
+            ->draft()
+            ->create();
+
+        $partY = Part::factory()
+            ->forCertification($certY)
+            ->draft()
+            ->create();
+
+        // 担当資格XのPartは削除できる
+        $this->actingAs($coach)
+            ->delete(route('admin.parts.destroy', $partX))
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('parts', [
+            'id' => $partX->id,
+        ]);
+
+        // 担当外資格YのPartは削除できない
+        $this->actingAs($coach)
+            ->delete(route('admin.parts.destroy', $partY))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('parts', [
+            'id' => $partY->id,
+        ]);
     }
 }

@@ -8,11 +8,12 @@ use App\Models\Certification;
 use App\Models\Part;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\ContentTestHelpers;
 use Tests\TestCase;
 
 class PublishTest extends TestCase
 {
-    use RefreshDatabase;
+    use ContentTestHelpers, RefreshDatabase;
 
     public function test_admin_can_publish_draft_part(): void
     {
@@ -51,5 +52,57 @@ class PublishTest extends TestCase
             ->assertRedirect(route('admin.parts.show', $part));
 
         $this->assertSame('draft', $part->fresh()->status->value);
+    }
+
+    public function test_assigned_coach_can_publish_part_only_in_assigned_certification(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $certX = Certification::factory()->published()->create();
+        $certY = Certification::factory()->published()->create();
+
+        $this->assignCoach($coach, $certX);
+
+        $partX = Part::factory()->forCertification($certX)->draft()->create();
+        $partY = Part::factory()->forCertification($certY)->draft()->create();
+
+        // 担当資格XのPartは公開できる
+        $this->actingAs($coach)
+            ->post(route('admin.parts.publish', $partX))
+            ->assertRedirect();
+
+        $this->assertSame('published', $partX->fresh()->status->value);
+
+        // 担当外資格YのPartは公開できない
+        $this->actingAs($coach)
+            ->post(route('admin.parts.publish', $partY))
+            ->assertForbidden();
+
+        $this->assertSame('draft', $partY->fresh()->status->value);
+    }
+
+    public function test_assigned_coach_can_unpublish_part_only_in_assigned_certification(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $certX = Certification::factory()->published()->create();
+        $certY = Certification::factory()->published()->create();
+
+        $this->assignCoach($coach, $certX);
+
+        $partX = Part::factory()->forCertification($certX)->published()->create();
+        $partY = Part::factory()->forCertification($certY)->published()->create();
+
+        // 担当資格XのPartは非公開できる
+        $this->actingAs($coach)
+            ->post(route('admin.parts.unpublish', $partX))
+            ->assertRedirect();
+
+        $this->assertSame('draft', $partX->fresh()->status->value);
+
+        // 担当外資格YのPartは非公開できない
+        $this->actingAs($coach)
+            ->post(route('admin.parts.unpublish', $partY))
+            ->assertForbidden();
+
+        $this->assertSame('published', $partY->fresh()->status->value);
     }
 }

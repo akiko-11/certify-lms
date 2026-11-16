@@ -101,4 +101,147 @@ class CrudTest extends TestCase
             ->get(route('admin.certifications.question-categories.index', $cert))
             ->assertForbidden();
     }
+
+    public function test_assigned_coach_can_view_only_assigned_question_categories(): void
+    {
+        // テストデータを準備
+        $coach = User::factory()->coach()->create();
+
+        $certX = Certification::factory()->published()->create();
+        $certY = Certification::factory()->published()->create();
+
+        // コーチを資格Xにだけ割り当てる
+        $this->assignCoach($coach, $certX);
+
+        // 資格Xは閲覧可能
+        $this->actingAs($coach)
+            ->get(route('admin.certifications.question-categories.index', $certX))
+            ->assertOk();
+
+        // 資格Yは閲覧不可
+        $this->actingAs($coach)
+            ->get(route('admin.certifications.question-categories.index', $certY))
+            ->assertForbidden();
+    }
+
+    public function test_assigned_coach_can_create_only_own_question_categories(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $certX = Certification::factory()->published()->create();
+        $certY = Certification::factory()->published()->create();
+
+        $this->assignCoach($coach, $certX);
+
+        // 担当資格Xには作成できる
+        $this->actingAs($coach)
+            ->post(route('admin.certifications.question-categories.store', $certX), [
+                'name' => 'テクノロジー系',
+                'slug' => 'technology',
+                'sort_order' => 10,
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('question_categories', [
+            'certification_id' => $certX->id,
+            'slug' => 'technology',
+        ]);
+
+        // 担当外資格Yには作成できない
+        $this->actingAs($coach)
+            ->post(route('admin.certifications.question-categories.store', $certY), [
+                'name' => '担当外の分野',
+                'slug' => 'outside',
+                'sort_order' => 10,
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('question_categories', [
+            'certification_id' => $certY->id,
+            'slug' => 'outside',
+        ]);
+    }
+
+    public function test_assigned_coach_can_update_only_own_question_categories(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $certX = Certification::factory()->published()->create();
+        $certY = Certification::factory()->published()->create();
+
+        $this->assignCoach($coach, $certX);
+
+        $categoryX = QuestionCategory::factory()
+            ->forCertification($certX)
+            ->create(['name' => '更新前X', 'slug' => 'before-x']);
+
+        $categoryY = QuestionCategory::factory()
+            ->forCertification($certY)
+            ->create(['name' => '更新前Y', 'slug' => 'before-y']);
+
+        // 担当資格Xの出題分野を更新できる
+        $this->actingAs($coach)
+            ->patch(route('admin.question-categories.update', $categoryX), [
+                'name' => '更新後X',
+                'slug' => 'after-x',
+                'sort_order' => 10,
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('question_categories', [
+            'id' => $categoryX->id,
+            'name' => '更新後X',
+            'slug' => 'after-x',
+        ]);
+
+        // 担当外資格Yの出題分野は更新できない
+        $this->actingAs($coach)
+            ->patch(route('admin.question-categories.update', $categoryY), [
+                'name' => '不正更新',
+                'slug' => 'invalid-update',
+                'sort_order' => 10,
+            ])
+            ->assertForbidden();
+
+        // 資格Yのデータが変更されていないこと
+        $this->assertDatabaseHas('question_categories', [
+            'id' => $categoryY->id,
+            'name' => '更新前Y',
+            'slug' => 'before-y',
+        ]);
+    }
+
+    public function test_assigned_coach_can_delete_only_own_question_categories(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $certX = Certification::factory()->published()->create();
+        $certY = Certification::factory()->published()->create();
+
+        $this->assignCoach($coach, $certX);
+
+        $categoryX = QuestionCategory::factory()
+            ->forCertification($certX)
+            ->create();
+
+        $categoryY = QuestionCategory::factory()
+            ->forCertification($certY)
+            ->create();
+
+        // 担当資格Xの出題分野は削除できる
+        $this->actingAs($coach)
+            ->delete(route('admin.question-categories.destroy', $categoryX))
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('question_categories', [
+            'id' => $categoryX->id,
+        ]);
+
+        // 担当外資格Yの出題分野は削除できない
+        $this->actingAs($coach)
+            ->delete(route('admin.question-categories.destroy', $categoryY))
+            ->assertForbidden();
+
+        // 担当外資格Yのデータが残っていること
+        $this->assertDatabaseHas('question_categories', [
+            'id' => $categoryY->id,
+        ]);
+    }
 }
