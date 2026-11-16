@@ -54,4 +54,37 @@ class StoreTest extends TestCase
             ->post(route('admin.certifications.parts.store', $cert), ['title' => 'X'])
             ->assertForbidden();
     }
+
+    public function test_assigned_coach_can_create_part_only_in_assigned_certification(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $certX = Certification::factory()->published()->create();
+        $certY = Certification::factory()->published()->create();
+
+        $this->assignCoach($coach, $certX);
+
+        // 担当資格Xには作成できる
+        $this->actingAs($coach)
+            ->post(route('admin.certifications.parts.store', $certX), [
+                'title' => '担当資格のPart',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('parts', [
+            'certification_id' => $certX->id,
+            'title' => '担当資格のPart',
+        ]);
+
+        // 担当外資格Yには作成できない
+        $this->actingAs($coach)
+            ->post(route('admin.certifications.parts.store', $certY), [
+                'title' => '担当外資格のPart',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('parts', [
+            'certification_id' => $certY->id,
+            'title' => '担当外資格のPart',
+        ]);
+    }
 }

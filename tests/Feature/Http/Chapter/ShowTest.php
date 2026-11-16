@@ -10,6 +10,7 @@ use App\Models\Part;
 use App\Models\Section;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\ContentTestHelpers;
 use Tests\TestCase;
 
 /**
@@ -18,7 +19,7 @@ use Tests\TestCase;
  */
 class ShowTest extends TestCase
 {
-    use RefreshDatabase;
+    use ContentTestHelpers, RefreshDatabase;
 
     public function test_sections_are_listed_in_order_ascending(): void
     {
@@ -42,5 +43,31 @@ class ShowTest extends TestCase
             $response->viewData('chapter')->sections->pluck('order')->all(),
             'Chapter 詳細の Section 一覧は order 昇順で並ぶはず(登録順ではない)',
         );
+    }
+
+    public function test_assigned_coach_can_view_chapter_only_in_assigned_certification(): void
+    {
+        // テストデータの準備
+        $coach = User::factory()->coach()->create();
+        $certX = Certification::factory()->published()->create();
+        $certY = Certification::factory()->published()->create();
+
+        $this->assignCoach($coach, $certX);
+
+        $partX = Part::factory()->forCertification($certX)->draft()->create();
+        $partY = Part::factory()->forCertification($certY)->draft()->create();
+
+        $chapterX = Chapter::factory()->forPart($partX)->draft()->create();
+        $chapterY = Chapter::factory()->forPart($partY)->draft()->create();
+
+        // 担当資格X：閲覧できる
+        $this->actingAs($coach)
+            ->get(route('admin.chapters.show', $chapterX))
+            ->assertOk();
+
+        // 担当外資格Y：閲覧できない
+        $this->actingAs($coach)
+            ->get(route('admin.chapters.show', $chapterY))
+            ->assertForbidden();
     }
 }

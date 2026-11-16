@@ -8,11 +8,12 @@ use App\Models\Certification;
 use App\Models\Part;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\ContentTestHelpers;
 use Tests\TestCase;
 
 class ReorderTest extends TestCase
 {
-    use RefreshDatabase;
+    use ContentTestHelpers, RefreshDatabase;
 
     public function test_reorder_updates_order_columns(): void
     {
@@ -46,5 +47,49 @@ class ReorderTest extends TestCase
                 'ids' => [$a->id, $foreign->id],
             ])
             ->assertStatus(422);
+    }
+
+    public function test_assigned_coach_can_reorder_parts_only_in_assigned_certification(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $certX = Certification::factory()->published()->create();
+        $certY = Certification::factory()->published()->create();
+
+        $this->assignCoach($coach, $certX);
+
+        // 担当資格XのPart
+        $partX1 = Part::factory()->forCertification($certX)
+            ->state(['order' => 1])->create();
+
+        $partX2 = Part::factory()->forCertification($certX)
+            ->state(['order' => 2])->create();
+
+        // 担当外資格YのPart
+        $partY1 = Part::factory()->forCertification($certY)
+            ->state(['order' => 1])->create();
+
+        $partY2 = Part::factory()->forCertification($certY)
+            ->state(['order' => 2])->create();
+
+        // 担当資格XのPartは並び替えできる
+        $this->actingAs($coach)
+            ->patch(route('admin.certifications.parts.reorder', $certX), [
+                'ids' => [$partX2->id, $partX1->id],
+            ])
+            ->assertRedirect();
+
+        $this->assertSame(1, $partX2->fresh()->order);
+        $this->assertSame(2, $partX1->fresh()->order);
+
+        // 担当外資格YのPartは並び替えできない
+        $this->actingAs($coach)
+            ->patch(route('admin.certifications.parts.reorder', $certY), [
+                'ids' => [$partY2->id, $partY1->id],
+            ])
+            ->assertForbidden();
+
+        // 担当外資格Yの並び順は変更されていない
+        $this->assertSame(1, $partY1->fresh()->order);
+        $this->assertSame(2, $partY2->fresh()->order);
     }
 }
