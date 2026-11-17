@@ -339,4 +339,30 @@ class OnboardingTest extends TestCase
             'meeting_url' => null,
         ]);
     }
+
+    public function test_completed_onboarding_user_can_login_again_after_logout(): void
+    {
+        $invitation = $this->freshInvitation();
+        $user = $invitation->user;
+
+        // オンボーディング完了
+        $this->post($this->postUrl($invitation), [
+            'name' => '受講太郎',
+            'password' => 'secret-pass',
+            'password_confirmation' => 'secret-pass',
+        ])->assertRedirect(route('dashboard.index'));
+
+        // ログアウト
+        $this->post('/logout');
+        $this->assertGuest();
+
+        // 同じアカウントで再ログイン
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'secret-pass',
+        ]);
+
+        $response->assertRedirect(config('fortify.home'));
+        $this->assertAuthenticatedAs($user);
+    }
 }
