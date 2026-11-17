@@ -234,4 +234,38 @@ class BrowseControllerTest extends TestCase
 
         return [$student, $part];
     }
+
+    public function test_show_chapter_allows_learning_enrollment(): void
+    {
+        [$student, $certification, $section] =
+            $this->buildSectionFor(EnrollmentStatus::Learning);
+
+        $this->actingAs($student)
+            ->get(route('learning.chapters.show', $section->chapter))
+            ->assertOk();
+    }
+
+    public function test_show_chapter_forbidden_for_non_enrolled_student(): void
+    {
+        [$enrolledStudent, $certification, $section] =
+            $this->buildSectionFor(EnrollmentStatus::Learning);
+
+        $otherStudent = User::factory()->student()->inProgress()->create();
+
+        $this->actingAs($otherStudent)
+            ->get(route('learning.chapters.show', $section->chapter))
+            ->assertForbidden();
+    }
+
+    public function test_show_section_forbidden_for_non_enrolled_student(): void
+    {
+        [$enrolledStudent, $certification, $section] =
+            $this->buildSectionFor(EnrollmentStatus::Learning);
+
+        $otherStudent = User::factory()->student()->inProgress()->create();
+
+        $this->actingAs($otherStudent)
+            ->get(route('learning.sections.show', $section))
+            ->assertForbidden();
+    }
 }

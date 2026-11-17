@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\UseCases\Learning;
 
 use App\Enums\ContentStatus;
+use App\Enums\EnrollmentStatus;
 use App\Models\Chapter;
 use App\Models\SectionProgress;
 use App\Models\User;
@@ -38,10 +39,16 @@ final class ShowChapterAction
 
         $enrollment = $student->enrollments()
             ->where('certification_id', $chapter->part->certification_id)
+            ->whereIn('status', [
+                EnrollmentStatus::Learning->value,
+                EnrollmentStatus::Passed->value,
+            ])
             ->first();
 
+        abort_if($enrollment === null, 403);
+
         $completedSectionIds = [];
-        if ($enrollment !== null && $sections->isNotEmpty()) {
+        if ($sections->isNotEmpty()) {
             $completedSectionIds = SectionProgress::query()
                 ->where('enrollment_id', $enrollment->id)
                 ->whereIn('section_id', $sections->pluck('id'))
