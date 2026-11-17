@@ -9,6 +9,7 @@ use App\Models\MockExam;
 use App\Models\MockExamSession;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class CrudTest extends TestCase
@@ -139,5 +140,83 @@ class CrudTest extends TestCase
             ->assertRedirect();
 
         $this->assertDatabaseMissing('mock_exams', ['id' => $mockExam->id]);
+    }
+
+    public static function passingScoreCases(): array
+    {
+        return [
+            '下限未満：0' => [0, false],
+            '下限値：1' => [1, true],
+            '上限値：100' => [100, true],
+            '上限超過：101' => [101, false],
+        ];
+    }
+
+    #[DataProvider('passingScoreCases')]
+    public function test_store_validates_passing_score_boundaries(
+        int $score,
+        bool $isValid
+    ): void {
+        $admin = User::factory()->admin()->create();
+        $cert = Certification::factory()->published()->create();
+
+        $response = $this->actingAs($admin)
+            ->post(route('admin.mock-exams.store'), [
+                'certification_id' => $cert->id,
+                'title' => '境界値テスト',
+                'description' => null,
+                'order' => 0,
+                'passing_score' => $score,
+            ]);
+
+        if ($isValid) {
+            $response->assertRedirect();
+
+            $this->assertDatabaseHas('mock_exams', [
+                'title' => '境界値テスト',
+                'passing_score' => $score,
+            ]);
+        } else {
+            $response->assertSessionHasErrors('passing_score');
+
+            $this->assertDatabaseMissing('mock_exams', [
+                'title' => '境界値テスト',
+            ]);
+        }
+    }
+
+    #[DataProvider('passingScoreCases')]
+    public function test_update_validates_passing_score_boundaries(
+        int $score,
+        bool $isValid
+    ): void {
+        $admin = User::factory()->admin()->create();
+        $mockExam = MockExam::factory()->create([
+            'passing_score' => 60,
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->put(route('admin.mock-exams.update', $mockExam), [
+                'title' => $mockExam->title,
+                'description' => $mockExam->description,
+                'order' => $mockExam->order,
+                'passing_score' => $score,
+            ]);
+
+        if ($isValid) {
+            $response->assertRedirect();
+
+            $this->assertSame(
+                $score,
+                $mockExam->fresh()->passing_score
+            );
+        } else {
+            $response->assertSessionHasErrors('passing_score');
+
+            $this->assertSame(
+                60,
+                $mockExam->fresh()->passing_score
+            );
+        }
     }
 }
