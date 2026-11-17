@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\UseCases\Learning;
 
 use App\Enums\ContentStatus;
+use App\Enums\EnrollmentStatus;
 use App\Models\Section;
 use App\Models\SectionProgress;
 use App\Models\User;
@@ -55,15 +56,18 @@ final class ShowSectionAction
 
         $enrollment = $student->enrollments()
             ->where('certification_id', $part->certification_id)
+            ->whereIn('status', [
+                EnrollmentStatus::Learning->value,
+                EnrollmentStatus::Passed->value,
+            ])
             ->first();
 
-        $completed = false;
-        if ($enrollment !== null) {
-            $completed = SectionProgress::query()
-                ->where('enrollment_id', $enrollment->id)
-                ->where('section_id', $section->id)
-                ->exists();
-        }
+        abort_if($enrollment === null, 403);
+
+        $completed = SectionProgress::query()
+            ->where('enrollment_id', $enrollment->id)
+            ->where('section_id', $section->id)
+            ->exists();
 
         $hasSectionQuestions = $section->questions()->exists();
         $sectionQuizSummary = $hasSectionQuestions
