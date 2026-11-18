@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\UseCases\Learning;
 
+use App\Enums\CertificationStatus;
 use App\Enums\ContentStatus;
 use App\Enums\EnrollmentStatus;
 use App\Models\Section;
@@ -36,8 +37,9 @@ final class ShowSectionAction
         $part = $chapter?->part;
 
         if ($section->status !== ContentStatus::Published
-            || $chapter === null || $chapter->status !== ContentStatus::Published
-            || $part === null || $part->status !== ContentStatus::Published) {
+    || $chapter === null || $chapter->status !== ContentStatus::Published
+    || $part === null || $part->status !== ContentStatus::Published
+    || $part->certification?->status !== CertificationStatus::Published) {
             throw new NotFoundHttpException;
         }
 
