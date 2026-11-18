@@ -10,7 +10,9 @@ use App\Models\Certification;
 use App\Models\CoachAvailability;
 use App\Models\Enrollment;
 use App\Models\Meeting;
+use App\Models\MeetingQuotaTransaction;
 use App\Models\User;
+use App\Services\MeetingQuotaService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -314,6 +316,118 @@ class MeetingControllerTest extends TestCase
             'related_meeting_id' => $meeting->id,
             'type' => MeetingQuotaTransactionType::Refunded->value,
             'amount' => 1,
+        ]);
+    }
+
+    public function test_cancel_restores_remaining_meeting_quota(): void
+    {
+        // Arrange：初期面談回数5回の受講生
+        $student = User::factory()->student()->inProgress()->create([
+            'max_meetings' => 5,
+        ]);
+
+        $coach = User::factory()->coach()->create();
+
+        $meeting = Meeting::factory()
+            ->reserved()
+            ->forCoach($coach)
+            ->forStudent($student)
+            ->create([
+                'scheduled_at' => now()->addDays(3)->startOfHour(),
+            ]);
+
+        // 予約時に1回消費済みの状態を再現
+        MeetingQuotaTransaction::create([
+            'user_id' => $student->id,
+            'type' => MeetingQuotaTransactionType::Consumed,
+            'amount' => -1,
+            'related_meeting_id' => $meeting->id,
+            'occurred_at' => now(),
+        ]);
+
+        $quotaService = app(MeetingQuotaService::class);
+
+        // キャンセル前：5 - 1 = 4回
+        $this->assertSame(4, $quotaService->remaining($student));
+
+        // Act：面談をキャンセル
+        $response = $this->actingAs($student)
+            ->post(route('meetings.cancel', $meeting));
+
+        // Assert：キャンセル成功
+        $response->assertRedirect();
+
+        $this->assertSame(
+            MeetingStatus::Canceled,
+            $meeting->fresh()->status
+        );
+
+        // キャンセル後：5 - 1 + 1 = 5回
+        $this->assertSame(
+            5,
+            $quotaService->remaining($student->fresh())
+        );
+
+        // 返却履歴が作成されている
+        $this->assertDatabaseHas('meeting_quota_transactions', [
+            'user_id' => $student->id,
+            'related_meeting_id' => $meeting->id,
+            'type' => MeetingQuotaTransactionType::Refunded->value,
+            'amount' => 1,
+        ]);
+    }
+
+    public function test_coach_cancel_refunds_student_meeting_quota(): void
+    {
+        // Arrange
+        $student = User::factory()->student()->inProgress()->create([
+            'max_meetings' => 5,
+        ]);
+
+        $coach = User::factory()->coach()->create();
+
+        $meeting = Meeting::factory()
+            ->reserved()
+            ->forCoach($coach)
+            ->forStudent($student)
+            ->create([
+                'scheduled_at' => now()->addDays(3)->startOfHour(),
+            ]);
+
+        // 受講生の面談回数を1回消費済みにする
+        MeetingQuotaTransaction::create([
+            'user_id' => $student->id,
+            'type' => MeetingQuotaTransactionType::Consumed,
+            'amount' => -1,
+            'related_meeting_id' => $meeting->id,
+            'occurred_at' => now(),
+        ]);
+
+        // Act：コーチとしてキャンセル
+        $response = $this->actingAs($coach)
+            ->post(route('meetings.cancel', $meeting));
+
+        // Assert：キャンセル成功
+        $response->assertRedirect();
+
+        $this->assertSame(
+            MeetingStatus::Canceled,
+            $meeting->fresh()->status
+        );
+
+        // 受講生に返却されている
+        $this->assertDatabaseHas('meeting_quota_transactions', [
+            'user_id' => $student->id,
+            'related_meeting_id' => $meeting->id,
+            'type' => MeetingQuotaTransactionType::Refunded->value,
+            'amount' => 1,
+        ]);
+
+        // コーチには返却されていない
+        $this->assertDatabaseMissing('meeting_quota_transactions', [
+            'user_id' => $coach->id,
+            'related_meeting_id' => $meeting->id,
+            'type' => MeetingQuotaTransactionType::Refunded->value,
         ]);
     }
 }
