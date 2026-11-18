@@ -147,4 +147,61 @@ class ChatUnreadCountServiceTest extends TestCase
 
         $this->assertSame([], $counts);
     }
+
+    public function test_room_count_for_user_excludes_own_messages(): void
+    {
+        // Arrange：受講生が参加するチャットルーム
+        $student = User::factory()->student()->inProgress()->create();
+
+        $enrollment = Enrollment::factory()->for($student)->create();
+        $room = ChatRoom::factory()->for($enrollment)->create();
+
+        ChatMember::factory()->create([
+            'chat_room_id' => $room->id,
+            'user_id' => $student->id,
+            'last_read_at' => null,
+        ]);
+
+        // 自分が送信したメッセージのみ存在する
+        ChatMessage::factory()->create([
+            'chat_room_id' => $room->id,
+            'sender_user_id' => $student->id,
+        ]);
+
+        // Act：未読メッセージがあるルーム数を取得
+        $count = app(ChatUnreadCountService::class)->roomCountForUser($student);
+
+        // Assert：自分のメッセージは未読としてカウントされない
+        $this->assertSame(0, $count);
+    }
+
+    public function test_message_counts_by_room_excludes_own_messages(): void
+    {
+        // Arrange：受講生が参加するチャットルーム
+        $student = User::factory()->student()->inProgress()->create();
+
+        $enrollment = Enrollment::factory()->for($student)->create();
+        $room = ChatRoom::factory()->for($enrollment)->create();
+
+        ChatMember::factory()->create([
+            'chat_room_id' => $room->id,
+            'user_id' => $student->id,
+            'last_read_at' => null,
+        ]);
+
+        // 自分が送信したメッセージのみ存在する
+        ChatMessage::factory()->create([
+            'chat_room_id' => $room->id,
+            'sender_user_id' => $student->id,
+        ]);
+
+        // Act：ルーム別の未読メッセージ件数を取得
+        $counts = app(ChatUnreadCountService::class)->messageCountsByRoomForUser(
+            collect([$room]),
+            $student,
+        );
+
+        // Assert：自分のメッセージは未読件数に含まれない
+        $this->assertSame(0, $counts[$room->id]);
+    }
 }
