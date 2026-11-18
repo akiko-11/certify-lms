@@ -365,4 +365,74 @@ class OnboardingTest extends TestCase
         $response->assertRedirect(config('fortify.home'));
         $this->assertAuthenticatedAs($user);
     }
+
+    public function test_store_rejects_reused_invitation_token(): void
+    {
+        // Arrange：新しい招待を作成
+        $invitation = $this->freshInvitation();
+        $user = $invitation->user;
+        $url = $this->postUrl($invitation);
+
+        // 1回目：正常にオンボーディングを完了
+        $this->post($url, [
+            'name' => '初回登録',
+            'password' => 'secret-pass',
+            'password_confirmation' => 'secret-pass',
+        ])->assertRedirect(route('dashboard.index'));
+
+        // 招待が使用済みになっていることを確認
+        $this->assertDatabaseHas('invitations', [
+            'id' => $invitation->id,
+            'status' => InvitationStatus::Accepted->value,
+        ]);
+
+        // 1回目の登録情報を保存
+        $originalPassword = $user->fresh()->password;
+        $originalAcceptedAt = $invitation->fresh()->accepted_at;
+
+        $this->assertNotNull($originalAcceptedAt);
+
+        // ログアウト
+        $this->post('/logout');
+        $this->assertGuest();
+
+        // 2回目：同じ招待URLで再登録を試みる
+        $response = $this->post($url, [
+            'name' => '再利用による変更',
+            'password' => 'different-pass',
+            'password_confirmation' => 'different-pass',
+        ]);
+
+        // 正常完了のリダイレクトにならないことを確認
+        $this->assertNotSame(
+            route('dashboard.index'),
+            $response->headers->get('Location')
+        );
+
+        // サーバーエラーになっていないことを確認
+        $this->assertNotSame(500, $response->getStatusCode());
+
+        // ユーザー情報が変更されていないことを確認
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'name' => '初回登録',
+            'status' => UserStatus::InProgress->value,
+        ]);
+
+        $this->assertSame(
+            $originalPassword,
+            $user->fresh()->password
+        );
+
+        // 招待情報も変更されていないことを確認
+        $this->assertDatabaseHas('invitations', [
+            'id' => $invitation->id,
+            'status' => InvitationStatus::Accepted->value,
+        ]);
+
+        $this->assertEquals(
+            $originalAcceptedAt,
+            $invitation->fresh()->accepted_at
+        );
+    }
 }
