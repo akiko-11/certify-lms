@@ -13,6 +13,7 @@ use App\Models\Meeting;
 use App\Models\User;
 use App\Services\ChatUnreadCountService;
 use App\UseCases\Dashboard\FetchCoachDashboardAction;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Mockery;
@@ -43,19 +44,37 @@ class FetchCoachDashboardActionTest extends TestCase
         $coach = User::factory()->coach()->inProgress()->create();
         $cert = Certification::factory()->published()->create();
         $this->attachCoach($cert, $coach);
-        $enrollment = Enrollment::factory()->for($cert)->learning()->create();
+
+        $enrollment = Enrollment::factory()
+            ->for($cert)
+            ->learning()
+            ->create();
+
+        $latestStartedAt = now()->subDay()->startOfSecond();
 
         LearningSession::factory()
             ->forEnrollment($enrollment)
             ->forUser($enrollment->user)
             ->closed()
-            ->startedOn(now()->subDay())
+            ->startedOn($latestStartedAt->copy())
+            ->create();
+
+        LearningSession::factory()
+            ->forEnrollment($enrollment)
+            ->forUser($enrollment->user)
+            ->closed()
+            ->startedOn(now()->subDays(3))
             ->create();
 
         $vm = app(FetchCoachDashboardAction::class)($coach);
 
         $first = $vm->assignedEnrollments->first();
+
         $this->assertNotNull($first->last_activity_at);
+        $this->assertSame(
+            $latestStartedAt->toDateTimeString(),
+            Carbon::parse($first->last_activity_at)->toDateTimeString()
+        );
     }
 
     public function test_only_passed_and_learning_enrollments_are_displayed(): void
@@ -146,5 +165,24 @@ class FetchCoachDashboardActionTest extends TestCase
             'assigned_at' => now(),
             'unassigned_at' => null,
         ]);
+    }
+
+    public function test_last_activity_at_is_null_when_no_learning_sessions_exist(): void
+    {
+        $coach = User::factory()->coach()->inProgress()->create();
+        $cert = Certification::factory()->published()->create();
+        $this->attachCoach($cert, $coach);
+
+        Enrollment::factory()
+            ->for($cert)
+            ->learning()
+            ->create();
+
+        $vm = app(FetchCoachDashboardAction::class)($coach);
+
+        $this->assertCount(1, $vm->assignedEnrollments);
+        $this->assertNull(
+            $vm->assignedEnrollments->first()->last_activity_at
+        );
     }
 }
