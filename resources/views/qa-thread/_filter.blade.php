@@ -11,6 +11,15 @@
     $indexRoute ??= 'qa-board.index';
     $publishedStatus ??= \App\Enums\CertificationStatus::Published;
 @endphp
+{{-- 解決状態タブ専用の送信フォーム --}}
+<form
+    method="GET"
+    action="{{ route($indexRoute) }}"
+    id="qa-board-status-form"
+>
+    <input type="hidden" name="certification_id" value="{{ $currentCertId }}">
+    <input type="hidden" name="keyword" value="{{ $keyword }}">
+</form>
 
 <form novalidate method="GET" action="{{ route($indexRoute) }}" class="flex flex-wrap items-center gap-3" id="qa-board-filter-form">
     <input type="hidden" name="certification_id" value="{{ $currentCertId }}">
@@ -21,6 +30,7 @@
         @foreach ($segments as $value => $label)
             <button
                 type="submit"
+                form="qa-board-status-form"
                 name="status"
                 value="{{ $value }}"
                 role="tab"
@@ -69,9 +79,9 @@
             name="keyword"
             value="{{ $keyword }}"
             maxlength="100"
-            placeholder="質問の本文を検索..."
+            placeholder="タイトル・本文・回答を検索..."
             class="w-full text-[13px] py-2 pl-9 pr-3 rounded-md bg-white border border-default placeholder:text-ink-400 focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-500/15 transition-colors"
-            aria-label="質問本文を検索"
+            aria-label="タイトル・本文・回答を検索"
         >
     </div>
 </form>

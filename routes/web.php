@@ -25,6 +25,8 @@ use App\Http\Controllers\MockExamQuestionController;
 use App\Http\Controllers\MockExamSessionController;
 use App\Http\Controllers\MockExamSessionMonitorController;
 use App\Http\Controllers\PartController;
+use App\Http\Controllers\QaReplyController;
+use App\Http\Controllers\QaThreadController;
 use App\Http\Controllers\QuestionCategoryController;
 use App\Http\Controllers\QuizHistoryController;
 use App\Http\Controllers\QuizStatsController;
@@ -193,6 +195,28 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
     Route::post('enrollments/{enrollment}/fail', [EnrollmentManagementController::class, 'fail'])
         ->name('admin.enrollments.fail');
 });
+
+// ============================================================
+// 管理者専用 — 質問掲示板モデレーション
+// ============================================================
+Route::middleware(['auth', 'role:admin'])
+    ->prefix('admin/qa-board')
+    ->name('admin.qa-board.')
+    ->scopeBindings()
+    ->group(function () {
+        // 質問掲示板
+        Route::get('/', [QaThreadController::class, 'index'])->name('index');
+
+        // スレッドの詳細
+        Route::get('{thread}', [QaThreadController::class, 'show'])->name('show');
+
+        // 投稿のモデレーション削除
+        Route::delete('{thread}', [QaThreadController::class, 'destroy'])->name('destroy');
+
+        // 投稿に対する回答のモデレーション削除
+        Route::delete('{thread}/replies/{reply}', [QaReplyController::class, 'destroy'])
+            ->name('replies.destroy');
+    });
 
 // ============================================================
 // admin + コーチ共有ルート(資格マスタ閲覧 / 教材管理: コーチは担当資格のみ Policy + scope で絞り込み)
@@ -415,6 +439,66 @@ Route::middleware(['auth', 'role:student,coach', 'active-learning'])->group(func
     Route::post('chat-rooms/{room}/messages', [ChatRoomController::class, 'storeMessage'])
         ->name('chat.storeMessage');
 });
+
+// ============================================================
+// 受講生・コーチ共有 — 質問掲示板
+// ============================================================
+Route::middleware(['auth', 'role:student,coach', 'active-learning'])
+    ->prefix('qa-board')
+    ->name('qa-board.')
+    ->scopeBindings()
+    ->group(function () {
+
+        // 質問掲示板
+        Route::get('/', [QaThreadController::class, 'index'])->name('index');
+
+        // 受講生による質問スレッドの新規投稿作成
+        Route::get('create', [QaThreadController::class, 'create'])
+            ->middleware('role:student')->name('create');
+
+        // 受講生による質問スレッドの新規投稿
+        Route::post('/', [QaThreadController::class, 'store'])
+            ->middleware('role:student')->name('store');
+
+        // 質問スレッドの詳細
+        Route::get('{thread}', [QaThreadController::class, 'show'])->name('show');
+
+        // 投稿者本人による質問スレッドの編集
+        Route::get('{thread}/edit', [QaThreadController::class, 'edit'])
+            ->middleware('role:student')->name('edit');
+
+        // 投稿者本人による質問スレッドの更新
+        Route::patch('{thread}', [QaThreadController::class, 'update'])
+            ->middleware('role:student')->name('update');
+
+        // 投稿者本人による質問スレッドの削除
+        Route::delete('{thread}', [QaThreadController::class, 'destroy'])
+            ->middleware('role:student')->name('destroy');
+
+        // 投稿者本人によるスレッド解決済の切り替え
+        Route::post('{thread}/resolve', [QaThreadController::class, 'resolve'])
+            ->middleware('role:student')->name('resolve');
+
+        // 投稿者本人によるスレッド未解決の切り替え
+        Route::post('{thread}/unresolve', [QaThreadController::class, 'unresolve'])
+            ->middleware('role:student')->name('unresolve');
+
+        // 受講生・コーチによる回答の投稿
+        Route::post('{thread}/replies', [QaReplyController::class, 'store'])
+            ->name('replies.store');
+
+        // 投稿者本人による回答の編集
+        Route::get('{thread}/replies/{reply}/edit', [QaReplyController::class, 'edit'])
+            ->name('replies.edit');
+
+        // 投稿者本人による回答の更新
+        Route::patch('{thread}/replies/{reply}', [QaReplyController::class, 'update'])
+            ->name('replies.update');
+
+        // 投稿者本人による回答の削除
+        Route::delete('{thread}/replies/{reply}', [QaReplyController::class, 'destroy'])
+            ->name('replies.destroy');
+    });
 
 // ============================================================
 // コーチ専用 — chat 未読あり一覧
