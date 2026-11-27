@@ -26,8 +26,8 @@
             <x-form.input
                 name="name"
                 label="SKU 名"
-                :value="old('name')"
-                :error="$errors->first('name')"
+                :value="data_get($formState, 'input.name')"
+                :error="data_get($formState, 'errors.name.0', '')"
                 placeholder="5 回パック"
                 :required="true"
                 maxlength="100"
@@ -36,8 +36,8 @@
             <x-form.textarea
                 name="description"
                 label="説明"
-                :value="old('description')"
-                :error="$errors->first('description')"
+                :value="data_get($formState, 'input.description')"
+                :error="data_get($formState, 'errors.description.0', '')"
                 :rows="3"
                 :maxlength="2000"
                 hint="任意、最大 2000 文字"
@@ -48,8 +48,8 @@
                     name="meeting_count"
                     label="面談回数"
                     type="number"
-                    :value="old('meeting_count', 1)"
-                    :error="$errors->first('meeting_count')"
+                    :value="data_get($formState, 'input.meeting_count', 1)"
+                    :error="data_get($formState, 'errors.meeting_count.0', '')"
                     hint="1 〜 100 の整数"
                     :required="true"
                 />
@@ -58,8 +58,8 @@
                     name="price"
                     label="価格(円)"
                     type="number"
-                    :value="old('price', 3000)"
-                    :error="$errors->first('price')"
+                    :value="data_get($formState, 'input.price', 3000)"
+                    :error="data_get($formState, 'errors.price.0', '')"
                     hint="0 〜 1,000,000 の整数"
                     :required="true"
                 />
@@ -69,8 +69,8 @@
                 <x-form.input
                     name="stripe_price_id"
                     label="Stripe Price ID(任意)"
-                    :value="old('stripe_price_id')"
-                    :error="$errors->first('stripe_price_id')"
+                    :value="data_get($formState, 'input.stripe_price_id')"
+                    :error="data_get($formState, 'errors.stripe_price_id.0', '')"
                     placeholder="price_..."
                     hint="事前に Stripe ダッシュボードで発行した Price ID を紐付ける場合のみ"
                 />
@@ -79,8 +79,8 @@
                     name="sort_order"
                     label="並び順"
                     type="number"
-                    :value="old('sort_order', 0)"
-                    :error="$errors->first('sort_order')"
+                    :value="data_get($formState, 'input.sort_order', 0)"
+                    :error="data_get($formState, 'errors.sort_order.0', '')"
                     hint="小さい順に表示"
                 />
             </div>

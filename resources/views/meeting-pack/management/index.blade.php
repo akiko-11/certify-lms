@@ -9,6 +9,9 @@
 
 @php
     use App\Enums\MeetingPackStatus;
+    use App\Http\Requests\MeetingPack\IndexRequest;
+
+    $filterErrors = $errors->getBag(IndexRequest::ERROR_BAG);
 
     $statusBadge = fn (MeetingPackStatus $s) => match ($s) {
         MeetingPackStatus::Published => ['variant' => 'success', 'dot' => true],
@@ -39,28 +42,36 @@
 
     {{-- フィルタ --}}
     <x-card class="mt-6" padding="sm" shadow="sm">
-        <form novalidate method="GET" action="{{ route('admin.meeting-packs.index') }}" class="grid gap-3 sm:grid-cols-[1fr_180px_auto]">
-            <div class="relative">
-                <x-icon name="magnifying-glass" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500" />
-                <input
-                    type="search"
-                    name="keyword"
-                    value="{{ $keyword }}"
-                    placeholder="SKU 名で検索"
-                    maxlength="100"
-                    class="w-full text-sm py-2 pl-9 pr-3 rounded-md bg-white border border-ink-200 placeholder:text-ink-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-colors"
-                >
+        <form novalidate method="GET" action="{{ route('admin.meeting-packs.index') }}" class="grid items-start gap-3 sm:grid-cols-[1fr_180px_auto]">
+            <div>
+                <div class="relative">
+                    <x-icon name="magnifying-glass" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500" />
+                    <input
+                        type="search"
+                        name="keyword"
+                        value="{{ $keyword }}"
+                        placeholder="SKU 名で検索"
+                        maxlength="100"
+                        @if ($filterErrors->has('keyword')) aria-invalid="true" aria-describedby="keyword-error" @endif
+                        class="w-full text-sm py-2 pl-9 pr-3 rounded-md bg-white border border-ink-200 placeholder:text-ink-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-colors"
+                    >
+                </div>
+                <x-form.error name="keyword" :message="$filterErrors->first('keyword')" />
             </div>
 
-            <select
-                name="status"
-                class="text-sm py-2 px-3 rounded-md bg-white border border-ink-200 text-ink-900 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-colors"
-            >
-                <option value="">全ステータス</option>
-                @foreach (MeetingPackStatus::cases() as $s)
-                    <option value="{{ $s->value }}" @selected($status === $s->value)>{{ $s->label() }}</option>
-                @endforeach
-            </select>
+            <div>
+                <select
+                    name="status"
+                    @if ($filterErrors->has('status')) aria-invalid="true" aria-describedby="status-error" @endif
+                    class="w-full text-sm py-2 px-3 rounded-md bg-white border border-ink-200 text-ink-900 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-colors"
+                >
+                    <option value="">全ステータス</option>
+                    @foreach (MeetingPackStatus::cases() as $s)
+                        <option value="{{ $s->value }}" @selected($status === $s->value)>{{ $s->label() }}</option>
+                    @endforeach
+                </select>
+                <x-form.error name="status" :message="$filterErrors->first('status')" />
+            </div>
 
             <div class="flex items-center gap-2">
                 <x-button type="submit" variant="primary">
@@ -146,7 +157,9 @@
         </div>
 
         <div class="mt-6">
-            <x-paginator :paginator="$plans" />
+            @if ($plans->hasPages())
+                {{ $plans->links('pagination::tailwind') }}
+            @endif
         </div>
     @endif
 @endsection

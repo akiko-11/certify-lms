@@ -1,7 +1,7 @@
 {{--
     面談パック（追加購入用 SKU）の編集フォーム画面（管理者向けマスタ管理）。
     構成: 見出し → カード内フォーム（SKU 名 / 説明 / 面談回数・価格 / 外部決済 Price ID・並び順）→ キャンセル + 保存ボタン。
-    JS なし: 専用ページでのフォーム POST + @method('PATCH') 送信。既存値は old() フォールバックで初期表示。ステータス遷移操作は詳細画面側に分離。
+    JS なし: 専用ページでのフォーム POST + @method('PATCH') 送信。検証エラー時はこの面談パックの入力値を復元し、それ以外は保存済みの値を表示。ステータス遷移操作は詳細画面側に分離。
 --}}
 @extends('layouts.app')
 
@@ -28,8 +28,8 @@
             <x-form.input
                 name="name"
                 label="SKU 名"
-                :value="old('name', $plan->name)"
-                :error="$errors->first('name')"
+                :value="data_get($formState, 'input.name', $plan->name)"
+                :error="data_get($formState, 'errors.name.0', '')"
                 :required="true"
                 maxlength="100"
             />
@@ -37,8 +37,8 @@
             <x-form.textarea
                 name="description"
                 label="説明"
-                :value="old('description', $plan->description)"
-                :error="$errors->first('description')"
+                :value="data_get($formState, 'input.description', $plan->description)"
+                :error="data_get($formState, 'errors.description.0', '')"
                 :rows="3"
                 :maxlength="2000"
                 hint="任意、最大 2000 文字"
@@ -49,8 +49,8 @@
                     name="meeting_count"
                     label="面談回数"
                     type="number"
-                    :value="old('meeting_count', $plan->meeting_count)"
-                    :error="$errors->first('meeting_count')"
+                    :value="data_get($formState, 'input.meeting_count', $plan->meeting_count)"
+                    :error="data_get($formState, 'errors.meeting_count.0', '')"
                     hint="1 〜 100 の整数"
                     :required="true"
                 />
@@ -59,8 +59,8 @@
                     name="price"
                     label="価格(円)"
                     type="number"
-                    :value="old('price', $plan->price)"
-                    :error="$errors->first('price')"
+                    :value="data_get($formState, 'input.price', $plan->price)"
+                    :error="data_get($formState, 'errors.price.0', '')"
                     hint="0 〜 1,000,000 の整数"
                     :required="true"
                 />
@@ -70,8 +70,8 @@
                 <x-form.input
                     name="stripe_price_id"
                     label="Stripe Price ID(任意)"
-                    :value="old('stripe_price_id', $plan->stripe_price_id)"
-                    :error="$errors->first('stripe_price_id')"
+                    :value="data_get($formState, 'input.stripe_price_id', $plan->stripe_price_id)"
+                    :error="data_get($formState, 'errors.stripe_price_id.0', '')"
                     placeholder="price_..."
                     hint="事前に Stripe ダッシュボードで発行した Price ID を紐付ける場合のみ"
                 />
@@ -80,8 +80,8 @@
                     name="sort_order"
                     label="並び順"
                     type="number"
-                    :value="old('sort_order', $plan->sort_order)"
-                    :error="$errors->first('sort_order')"
+                    :value="data_get($formState, 'input.sort_order', $plan->sort_order)"
+                    :error="data_get($formState, 'errors.sort_order.0', '')"
                     hint="小さい順に表示"
                 />
             </div>
