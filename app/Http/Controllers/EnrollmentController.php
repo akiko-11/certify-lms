@@ -9,9 +9,11 @@ use App\Enums\EnrollmentStatus;
 use App\Enums\UserRole;
 use App\Http\Requests\Enrollment\StoreRequest;
 use App\Http\Requests\Enrollment\UpdateExamDateRequest;
+use App\Http\Requests\EnrollmentGoal\SaveRequest as GoalSaveRequest;
 use App\Models\Certification;
 use App\Models\Chapter;
 use App\Models\Enrollment;
+use App\Models\EnrollmentGoal;
 use App\Models\Part;
 use App\Services\Learning\ProgressSummary;
 use App\UseCases\Enrollment\DestroyAction;
@@ -102,9 +104,13 @@ class EnrollmentController extends Controller
     ): View {
         $this->authorize('view', $enrollment);
 
-        $action($enrollment);
-
         $user = auth()->user();
+        $canViewGoals = $user->can('view', [EnrollmentGoal::class, $enrollment]);
+        $action($enrollment, $canViewGoals);
+
+        $goalFormState = $user->can('create', [EnrollmentGoal::class, $enrollment])
+            ? GoalSaveRequest::restoreFormState($enrollment)
+            : [];
         $progress = null;
 
         // staff(admin / coach)時のみ進捗集計を行う
@@ -123,6 +129,8 @@ class EnrollmentController extends Controller
         return view('enrollment.show', [
             'enrollment' => $enrollment,
             'progress' => $progress,
+            'canViewGoals' => $canViewGoals,
+            'goalFormState' => $goalFormState,
         ]);
     }
 

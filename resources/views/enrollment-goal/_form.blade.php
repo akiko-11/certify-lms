@@ -16,8 +16,8 @@
         <x-form.input
             name="title"
             label="目標"
-            :value="old('title')"
-            :error="$errors->first('title')"
+            :value="data_get($goalFormState, 'input.title')"
+            :error="data_get($goalFormState, 'errors.title.0', '')"
             placeholder="例: 過去問 5 年分を解き終える"
             maxlength="100"
             :required="true"
@@ -26,15 +26,15 @@
             name="target_date"
             label="目標期日"
             type="date"
-            :value="old('target_date')"
-            :error="$errors->first('target_date')"
+            :value="data_get($goalFormState, 'input.target_date')"
+            :error="data_get($goalFormState, 'errors.target_date.0', '')"
         />
         <x-form.textarea
             name="description"
             label="詳細(任意)"
             :rows="2"
-            :value="old('description')"
-            :error="$errors->first('description')"
+            :value="data_get($goalFormState, 'input.description')"
+            :error="data_get($goalFormState, 'errors.description.0', '')"
             :maxlength="1000"
         />
         <x-button type="submit" variant="primary" size="sm">
@@ -61,17 +61,20 @@
                     <div class="text-sm font-semibold text-ink-900 {{ $goal->achieved_at ? 'line-through text-ink-500' : '' }}">
                         {{ $goal->title }}
                     </div>
-                    @if ($goal->description)
-                        <div class="text-xs text-ink-500 mt-0.5">{{ $goal->description }}</div>
+                    @if ($goal->description !== null)
+                        <div class="text-xs text-ink-500 mt-0.5 whitespace-pre-line">{{ $goal->description }}</div>
                     @endif
-                    <div class="text-xs text-ink-400 mt-1 tabular-nums">
-                        @if ($goal->target_date)
-                            期日: {{ $goal->target_date->format('Y-m-d') }}
-                        @endif
-                        @if ($goal->achieved_at)
-                            ・ 達成: {{ $goal->achieved_at->format('Y-m-d') }}
-                        @endif
-                    </div>
+                    @if ($goal->target_date || $goal->achieved_at)
+                        <div class="text-xs text-ink-400 mt-1 tabular-nums">
+                            @if ($goal->target_date)
+                                期日: {{ $goal->target_date->format('Y-m-d') }}
+                            @endif
+                            @if ($goal->achieved_at)
+                                @if ($goal->target_date) ・ @endif
+                                達成: {{ $goal->achieved_at->format('Y-m-d') }}
+                            @endif
+                        </div>
+                    @endif
                 </div>
                 <div class="flex items-center gap-1">
                     @if ($goal->achieved_at)

@@ -27,16 +27,18 @@ final class DestroyAction
      */
     public function __invoke(Enrollment $enrollment): void
     {
-        if ($enrollment->status !== EnrollmentStatus::Learning) {
-            throw EnrollmentInvalidTransitionException::forDestroy();
-        }
+        DB::transaction(function () use ($enrollment): void {
+            $current = Enrollment::query()->lockForUpdate()->findOrFail($enrollment->getKey());
 
-        DB::transaction(function () use ($enrollment) {
-            $user = $enrollment->user;
+            if ($current->status !== EnrollmentStatus::Learning) {
+                throw EnrollmentInvalidTransitionException::forDestroy();
+            }
 
-            $enrollment->delete();
+            $user = $current->user;
+            $current->delete();
+            $current->goals()->delete();
 
-            $this->defaultEnrollmentService->resolveAfterStatusChange($user, $enrollment);
+            $this->defaultEnrollmentService->resolveAfterStatusChange($user, $current);
         });
     }
 }

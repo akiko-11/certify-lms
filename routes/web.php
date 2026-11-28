@@ -13,6 +13,7 @@ use App\Http\Controllers\ChatRoomController;
 use App\Http\Controllers\ContentSearchController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EnrollmentController;
+use App\Http\Controllers\EnrollmentGoalController;
 use App\Http\Controllers\EnrollmentManagementController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LearningHourTargetController;
@@ -98,6 +99,15 @@ Route::middleware(['auth', 'role:student', 'active-learning'])->group(function (
     Route::delete('enrollments/{enrollment}', [EnrollmentController::class, 'destroy'])->name('enrollments.destroy');
     Route::post('enrollments/{enrollment}/resume', [EnrollmentController::class, 'resume'])->name('enrollments.resume');
     Route::patch('enrollments/{enrollment}/exam-date', [EnrollmentController::class, 'updateExamDate'])->name('enrollments.updateExamDate');
+
+    Route::post('enrollments/{enrollment}/goals', [EnrollmentGoalController::class, 'store'])->name('enrollments.goals.store');
+    Route::prefix('enrollment-goals/{goal}')->name('enrollment-goals.')->group(function () {
+        Route::get('edit', [EnrollmentGoalController::class, 'edit'])->name('edit');
+        Route::patch('/', [EnrollmentGoalController::class, 'update'])->name('update');
+        Route::delete('/', [EnrollmentGoalController::class, 'destroy'])->name('destroy');
+        Route::post('achieve', [EnrollmentGoalController::class, 'markAchieved'])->name('markAchieved');
+        Route::delete('achieve', [EnrollmentGoalController::class, 'unmarkAchieved'])->name('unmarkAchieved');
+    });
 
     // 修了証受領(受講生自己発火、graduated は active-learning でブロックされるため新規受領不可)
     Route::post('enrollments/{enrollment}/receive-certificate', [ReceiveCertificateController::class, 'store'])
