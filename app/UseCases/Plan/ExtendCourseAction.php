@@ -59,7 +59,9 @@ final class ExtendCourseAction
 
             $this->planLog->record($user, $plan, UserPlanLogEventType::Renewed, $admin, $reason);
 
-            ($this->grantQuota)($user, $plan->default_meeting_quota, $admin, $reason ?? 'プラン延長');
+            if ($plan->default_meeting_quota > 0) {
+                ($this->grantQuota)($user, $plan->default_meeting_quota, $admin, $reason ?? 'プラン延長');
+            }
 
             return $user->fresh();
         });

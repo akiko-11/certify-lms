@@ -60,6 +60,32 @@ class MeetingQuotaServiceTest extends TestCase
         $this->assertSame(5, $service->remaining($user2));
     }
 
+    public function test_remaining_for_users_matches_single_user_totals_with_one_query(): void
+    {
+        $first = User::factory()->student()->create(['max_meetings' => 4]);
+        $second = User::factory()->student()->create(['max_meetings' => 5]);
+        $third = User::factory()->student()->create(['max_meetings' => 0]);
+
+        MeetingQuotaTransaction::factory()->grantedInitial(4)->create(['user_id' => $first->id]);
+        MeetingQuotaTransaction::factory()->consumed()->count(2)->create(['user_id' => $first->id]);
+        MeetingQuotaTransaction::factory()->refunded()->create(['user_id' => $first->id]);
+        MeetingQuotaTransaction::factory()->purchased(5)->create(['user_id' => $first->id]);
+        MeetingQuotaTransaction::factory()->adminGrant(User::factory()->admin()->create(), 2)->create(['user_id' => $first->id]);
+        MeetingQuotaTransaction::factory()->consumed()->create(['user_id' => $second->id]);
+
+        $service = app(MeetingQuotaService::class);
+        $users = collect([$first, $second, $third]);
+        $expected = [$first->id => 10, $second->id => 4, $third->id => 0];
+        $this->assertSame($expected, $users->mapWithKeys(fn (User $user): array => [$user->id => $service->remaining($user)])->all());
+
+        DB::enableQueryLog();
+        $this->assertSame([], $service->remainingForUsers(collect()));
+        $this->assertCount(0, DB::getQueryLog());
+        $this->assertSame($expected, $service->remainingForUsers($users));
+        $this->assertCount(1, DB::getQueryLog());
+        DB::disableQueryLog();
+    }
+
     public function test_history_orders_by_occurred_at_desc(): void
     {
         $user = User::factory()->student()->create();

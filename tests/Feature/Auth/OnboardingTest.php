@@ -6,14 +6,18 @@ namespace Tests\Feature\Auth;
 
 use App\Enums\InvitationStatus;
 use App\Enums\MeetingQuotaTransactionType;
+use App\Enums\PlanStatus;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\Invitation;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\InvitationTokenService;
+use App\UseCases\Auth\IssueInvitationAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -236,6 +240,48 @@ class OnboardingTest extends TestCase
             'type' => MeetingQuotaTransactionType::GrantedInitial->value,
             'amount' => 9,
         ]);
+    }
+
+    #[DataProvider('quotaChanges')]
+    public function test_store_uses_invited_quota_and_current_duration_after_plan_edit(int $invitedQuota, int $currentQuota): void
+    {
+        Mail::fake();
+        $plan = $this->plan(durationDays: 30, quota: $invitedQuota);
+        $admin = User::factory()->admin()->create();
+        $invitation = app(IssueInvitationAction::class)('plan-test@example.com', UserRole::Student, $plan, $admin);
+        $user = $invitation->user;
+
+        $plan->update([
+            'default_meeting_quota' => $currentQuota,
+            'duration_days' => 90,
+            'status' => PlanStatus::Archived,
+        ]);
+
+        $this->post($this->postUrl($invitation), [
+            'name' => '受講生',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])->assertRedirect(route('dashboard.index'));
+
+        $user->refresh();
+        $this->assertSame($invitedQuota, $user->max_meetings);
+        $this->assertSame(
+            $user->plan_started_at->copy()->addDays(90)->toDateTimeString(),
+            $user->plan_expires_at->toDateTimeString(),
+        );
+        $this->assertSame(InvitationStatus::Accepted, $invitation->fresh()->status);
+        $this->assertSame(
+            $invitedQuota === 0 ? [] : [$invitedQuota],
+            $user->meetingQuotaTransactions()
+                ->where('type', MeetingQuotaTransactionType::GrantedInitial)
+                ->pluck('amount')
+                ->all(),
+        );
+    }
+
+    public static function quotaChanges(): array
+    {
+        return [[4, 8], [4, 0], [0, 4], [0, 0]];
     }
 
     public function test_store_rejects_short_password(): void

@@ -146,7 +146,9 @@
         </div>
 
         <div class="mt-6">
-            <x-paginator :paginator="$plans" />
+            @if ($plans->hasPages())
+                {{ $plans->links('pagination::tailwind') }}
+            @endif
         </div>
     @endif
 @endsection

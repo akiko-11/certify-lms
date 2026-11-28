@@ -45,6 +45,27 @@ class ExtendCourseActionTest extends TestCase
         ]);
     }
 
+    public function test_zero_quota_extension_changes_expiration_and_keeps_renewal_log(): void
+    {
+        $current = Plan::factory()->published()->create(['default_meeting_quota' => 4]);
+        $extension = Plan::factory()->published()->create(['duration_days' => 30, 'default_meeting_quota' => 0]);
+        $user = User::factory()->inProgress()->withPlan($current)->create();
+        $expires = $user->plan_expires_at->copy()->addDays(30);
+
+        $result = app(ExtendCourseAction::class)($user, $extension);
+
+        $this->assertSame($expires->toDateTimeString(), $result->plan_expires_at->toDateTimeString());
+        $this->assertSame(4, $result->max_meetings);
+        $this->assertSame($current->id, $result->plan_id);
+        $this->assertDatabaseHas('user_plan_logs', [
+            'user_id' => $user->id,
+            'plan_id' => $extension->id,
+            'event_type' => UserPlanLogEventType::Renewed->value,
+            'meeting_quota_initial' => 0,
+        ]);
+        $this->assertDatabaseMissing('meeting_quota_transactions', ['user_id' => $user->id]);
+    }
+
     public function test_records_renewed_user_plan_log(): void
     {
         $admin = User::factory()->admin()->create();

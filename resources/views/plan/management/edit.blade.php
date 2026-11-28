@@ -1,7 +1,7 @@
 {{--
     受講プランの編集フォーム画面（管理者向けマスタ管理）。
     構成: 見出し → カード内フォーム（プラン名 / 説明 / 受講期間・面談回数・並び順）→ キャンセル + 保存ボタン。
-    JS なし: 専用ページでのフォーム POST + @method('PUT') 送信。既存値は old() フォールバックで初期表示。ステータス遷移操作は詳細画面側に分離。
+    JS なし: 専用ページでのフォーム POST + @method('PUT') 送信。入力エラー時は編集対象専用のフォーム状態を優先。ステータス遷移操作は詳細画面側に分離。
 --}}
 @extends('layouts.app')
 
@@ -28,8 +28,8 @@
             <x-form.input
                 name="name"
                 label="プラン名"
-                :value="old('name', $plan->name)"
-                :error="$errors->first('name')"
+                :value="data_get($formState, 'input.name', $plan->name)"
+                :error="data_get($formState, 'errors.name.0', '')"
                 :required="true"
                 maxlength="100"
             />
@@ -37,8 +37,8 @@
             <x-form.textarea
                 name="description"
                 label="説明"
-                :value="old('description', $plan->description)"
-                :error="$errors->first('description')"
+                :value="data_get($formState, 'input.description', $plan->description)"
+                :error="data_get($formState, 'errors.description.0', '')"
                 :rows="3"
                 :maxlength="2000"
                 hint="任意、最大 2000 文字"
@@ -49,8 +49,8 @@
                     name="duration_days"
                     label="受講期間(日)"
                     type="number"
-                    :value="old('duration_days', $plan->duration_days)"
-                    :error="$errors->first('duration_days')"
+                    :value="data_get($formState, 'input.duration_days', $plan->duration_days)"
+                    :error="data_get($formState, 'errors.duration_days.0', '')"
                     hint="1 〜 3650 の整数"
                     :required="true"
                 />
@@ -59,8 +59,8 @@
                     name="default_meeting_quota"
                     label="初期付与面談回数"
                     type="number"
-                    :value="old('default_meeting_quota', $plan->default_meeting_quota)"
-                    :error="$errors->first('default_meeting_quota')"
+                    :value="data_get($formState, 'input.default_meeting_quota', $plan->default_meeting_quota)"
+                    :error="data_get($formState, 'errors.default_meeting_quota.0', '')"
                     hint="0 〜 1000 の整数"
                     :required="true"
                 />
@@ -69,8 +69,8 @@
                     name="sort_order"
                     label="並び順"
                     type="number"
-                    :value="old('sort_order', $plan->sort_order)"
-                    :error="$errors->first('sort_order')"
+                    :value="data_get($formState, 'input.sort_order', $plan->sort_order)"
+                    :error="data_get($formState, 'errors.sort_order.0', '')"
                 />
             </div>
 
