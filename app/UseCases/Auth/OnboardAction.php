@@ -98,11 +98,11 @@ final class OnboardAction
                 'accepted_at' => $now,
             ]);
 
-            // 面談クォータは受講生固有の消費対象。コーチは面談を提供する側のため初期付与しない。
-            if ($user->role === UserRole::Student && $user->plan->default_meeting_quota > 0) {
+            // 初期付与履歴には招待時に保存した回数を使う。
+            if ($user->role === UserRole::Student && $user->max_meetings > 0) {
                 ($this->grantInitial)(
                     $user,
-                    $user->plan->default_meeting_quota,
+                    $user->max_meetings,
                     admin: null,
                     reason: 'オンボーディング初期付与',
                 );

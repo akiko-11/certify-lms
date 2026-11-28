@@ -85,7 +85,7 @@
 
             @can('delete', $plan)
                 <form novalidate method="POST" action="{{ route('admin.plans.destroy', $plan) }}" class="inline-block"
-                      onsubmit="return confirm('このプランを削除しますか？(下書きかつ受講者未紐づきの場合のみ削除可能)');">
+                      onsubmit="return confirm('このプランを削除しますか？');">
                     @csrf
                     @method('DELETE')
                     <x-button type="submit" variant="danger">
@@ -112,7 +112,7 @@
 
         <x-card padding="md" shadow="sm">
             <x-slot:header>受講者数</x-slot:header>
-            <div class="text-3xl font-bold text-ink-900 tabular-nums">{{ $plan->users->count() }}</div>
+            <div class="text-3xl font-bold text-ink-900 tabular-nums">{{ $plan->inProgressStudents->count() }}</div>
             <div class="text-sm text-ink-500">名</div>
         </x-card>
     </div>
@@ -120,7 +120,7 @@
     <x-card class="mt-6" padding="md" shadow="sm">
         <x-slot:header>受講者一覧</x-slot:header>
 
-        @if ($plan->users->isEmpty())
+        @if ($plan->inProgressStudents->isEmpty())
             <p class="text-sm text-ink-500 py-4 text-center">このプランを受講中のユーザーはまだいません。</p>
         @else
             <x-table>
@@ -132,7 +132,7 @@
                         <x-table.heading class="text-right">残面談回数</x-table.heading>
                     </x-table.row>
                 </x-slot:head>
-                @foreach ($plan->users as $user)
+                @foreach ($plan->inProgressStudents as $user)
                     <x-table.row>
                         <x-table.cell>
                             <a href="{{ route('admin.users.show', $user) }}" class="text-sm font-medium text-ink-900 hover:text-primary-700">
@@ -148,7 +148,7 @@
                             </span>
                         </x-table.cell>
                         <x-table.cell class="text-right">
-                            <span class="text-sm text-ink-700 tabular-nums">{{ $user->max_meetings }}</span>
+                            <span class="text-sm text-ink-700 tabular-nums">{{ $remainingQuotas[$user->id] }}</span>
                         </x-table.cell>
                     </x-table.row>
                 @endforeach

@@ -8,6 +8,7 @@ use App\Enums\MeetingQuotaTransactionType;
 use App\Models\MeetingQuotaTransaction;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 
 /**
  * 面談回数の残数集計と履歴取得を提供するステートレス Service。
@@ -21,6 +22,13 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
  */
 final class MeetingQuotaService
 {
+    private const BALANCE_TRANSACTION_TYPES = [
+        MeetingQuotaTransactionType::Consumed,
+        MeetingQuotaTransactionType::Refunded,
+        MeetingQuotaTransactionType::Purchased,
+        MeetingQuotaTransactionType::AdminGrant,
+    ];
+
     /**
      * 受講生の残面談回数を 1 クエリで集計する。
      */
@@ -28,15 +36,33 @@ final class MeetingQuotaService
     {
         $sum = (int) MeetingQuotaTransaction::query()
             ->where('user_id', $user->id)
-            ->whereIn('type', [
-                MeetingQuotaTransactionType::Consumed,
-                MeetingQuotaTransactionType::Refunded,
-                MeetingQuotaTransactionType::Purchased,
-                MeetingQuotaTransactionType::AdminGrant,
-            ])
+            ->whereIn('type', self::BALANCE_TRANSACTION_TYPES)
             ->sum('amount');
 
         return $user->max_meetings + $sum;
+    }
+
+    /**
+     * @param Collection<int, User> $users
+     *
+     * @return array<string, int> ユーザーIDごとの残面談回数
+     */
+    public function remainingForUsers(Collection $users): array
+    {
+        if ($users->isEmpty()) {
+            return [];
+        }
+
+        $sums = MeetingQuotaTransaction::query()
+            ->whereIn('user_id', $users->pluck('id'))
+            ->whereIn('type', self::BALANCE_TRANSACTION_TYPES)
+            ->groupBy('user_id')
+            ->selectRaw('user_id, SUM(amount) AS balance_delta')
+            ->pluck('balance_delta', 'user_id');
+
+        return $users->mapWithKeys(fn (User $user): array => [
+            $user->id => $user->max_meetings + (int) $sums->get($user->id, 0),
+        ])->all();
     }
 
     /**

@@ -26,8 +26,8 @@
             <x-form.input
                 name="name"
                 label="プラン名"
-                :value="old('name')"
-                :error="$errors->first('name')"
+                :value="data_get($formState, 'input.name')"
+                :error="data_get($formState, 'errors.name.0', '')"
                 placeholder="1 ヶ月プラン 4 回"
                 :required="true"
                 maxlength="100"
@@ -36,8 +36,8 @@
             <x-form.textarea
                 name="description"
                 label="説明"
-                :value="old('description')"
-                :error="$errors->first('description')"
+                :value="data_get($formState, 'input.description')"
+                :error="data_get($formState, 'errors.description.0', '')"
                 :rows="3"
                 :maxlength="2000"
                 hint="任意、最大 2000 文字"
@@ -48,8 +48,8 @@
                     name="duration_days"
                     label="受講期間(日)"
                     type="number"
-                    :value="old('duration_days', 30)"
-                    :error="$errors->first('duration_days')"
+                    :value="data_get($formState, 'input.duration_days', 30)"
+                    :error="data_get($formState, 'errors.duration_days.0', '')"
                     hint="1 〜 3650 の整数"
                     :required="true"
                 />
@@ -58,8 +58,8 @@
                     name="default_meeting_quota"
                     label="初期付与面談回数"
                     type="number"
-                    :value="old('default_meeting_quota', 4)"
-                    :error="$errors->first('default_meeting_quota')"
+                    :value="data_get($formState, 'input.default_meeting_quota', 4)"
+                    :error="data_get($formState, 'errors.default_meeting_quota.0', '')"
                     hint="0 〜 1000 の整数"
                     :required="true"
                 />
@@ -68,8 +68,8 @@
                     name="sort_order"
                     label="並び順"
                     type="number"
-                    :value="old('sort_order', 0)"
-                    :error="$errors->first('sort_order')"
+                    :value="data_get($formState, 'input.sort_order', 0)"
+                    :error="data_get($formState, 'errors.sort_order.0', '')"
                     hint="小さい順に表示"
                 />
             </div>

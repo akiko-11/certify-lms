@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\PlanStatus;
+use App\Enums\UserRole;
+use App\Enums\UserStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -63,6 +65,35 @@ class Plan extends Model
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    /**
+     * @return HasMany<User, $this>
+     */
+    public function inProgressStudents(): HasMany
+    {
+        return $this->users()
+            ->where('role', UserRole::Student)
+            ->where('status', UserStatus::InProgress);
+    }
+
+    public function canTransitionTo(PlanStatus $target): bool
+    {
+        return $this->status === match ($target) {
+            PlanStatus::Published => PlanStatus::Draft,
+            PlanStatus::Archived => PlanStatus::Published,
+            PlanStatus::Draft => PlanStatus::Archived,
+        };
+    }
+
+    public function deletionBlockedReason(): ?string
+    {
+        return match (true) {
+            $this->status !== PlanStatus::Draft => '下書きのプランのみ削除できます。',
+            $this->users()->withTrashed()->exists() => 'ユーザーが紐づいているプランは削除できません。',
+            $this->userPlanLogs()->exists() => 'プラン履歴が存在するため削除できません。',
+            default => null,
+        };
     }
 
     /**
