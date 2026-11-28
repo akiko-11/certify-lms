@@ -23,8 +23,8 @@
             <x-form.input
                 name="title"
                 label="目標"
-                :value="old('title', $goal->title)"
-                :error="$errors->first('title')"
+                :value="data_get($formState, 'input.title', $goal->title)"
+                :error="data_get($formState, 'errors.title.0', '')"
                 placeholder="例: 過去問 5 年分を解き終える"
                 maxlength="100"
                 :required="true"
@@ -34,16 +34,16 @@
                 name="target_date"
                 label="目標期日"
                 type="date"
-                :value="old('target_date', $goal->target_date?->format('Y-m-d'))"
-                :error="$errors->first('target_date')"
+                :value="data_get($formState, 'input.target_date', $goal->target_date?->format('Y-m-d'))"
+                :error="data_get($formState, 'errors.target_date.0', '')"
             />
 
             <x-form.textarea
                 name="description"
                 label="詳細(任意)"
                 :rows="4"
-                :value="old('description', $goal->description)"
-                :error="$errors->first('description')"
+                :value="data_get($formState, 'input.description', $goal->description)"
+                :error="data_get($formState, 'errors.description.0', '')"
                 :maxlength="1000"
             />
 

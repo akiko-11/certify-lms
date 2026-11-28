@@ -222,7 +222,7 @@
             @endif
 
             {{-- 個人目標(受講生本人 CRUD、coach/admin 閲覧専用) --}}
-            @if (Route::has('enrollments.goals.store'))
+            @if ($canViewGoals)
                 <x-card padding="md" shadow="sm">
                     <x-slot:header>個人目標</x-slot:header>
                     @include('enrollment-goal._form', ['enrollment' => $enrollment])

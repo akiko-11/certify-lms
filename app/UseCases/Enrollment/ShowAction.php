@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\UseCases\Enrollment;
 
 use App\Models\Enrollment;
+use App\Models\EnrollmentGoal;
 
 /**
  * Enrollment 詳細取得 Action。受講生 / コーチ / admin 共通(認可は Controller の Policy で済ませる前提)。
@@ -13,13 +14,20 @@ use App\Models\Enrollment;
  */
 final class ShowAction
 {
-    public function __invoke(Enrollment $enrollment): Enrollment
+    public function __invoke(Enrollment $enrollment, bool $withGoals = false): Enrollment
     {
-        return $enrollment->loadMissing([
+        $enrollment->loadMissing([
             'certification.category',
             'certification.coaches',
             'certificate',
             'latestStatusLog.changedBy',
         ]);
+
+        if ($withGoals) {
+            $enrollment->load(['goals' => fn ($query) => $query->displayOrder()]);
+            $enrollment->goals->each(fn (EnrollmentGoal $goal) => $goal->setRelation('enrollment', $enrollment));
+        }
+
+        return $enrollment;
     }
 }

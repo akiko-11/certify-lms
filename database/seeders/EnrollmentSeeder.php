@@ -25,7 +25,7 @@ use Illuminate\Support\Carbon;
  *
  * 1. **固定アカウント**(deterministic): 動作確認・スクショ撮影で安定して参照できる「決まったユーザー」の受講登録を生成する。
  *    - `student@certify-lms.test` を CertificationSeeder 投入の published 資格 4 件に learning で登録(ダッシュボードの合格可能性バンド safe / warning / danger / データ不足 を 1 画面で網羅するため)
- *    - 1 件目に達成済 / 未達成の個人目標を 2 件追加(目標 CRUD・達成マーク UI の即時確認用)
+ *    - 個人目標の投入は後続の EnrollmentGoalSeeder が担当する
  *    - coach@(`coach1`) / coach2@ / admin@ が固定 student の Enrollment にメモを残す(他コーチ越境拒否シナリオ用)
  *
  * 2. **状態網羅 demo データ**(Factory + state + count): 一覧 / フィルタ / 状態遷移ボタン / 認可境界が各 status で動くことを実機確認する。
@@ -37,7 +37,8 @@ use Illuminate\Support\Carbon;
  */
 final class EnrollmentSeeder extends Seeder
 {
-    public function run(): void
+    /** @param list<string> $seededUserIds この初期投入で UserSeeder が作成したユーザーID。 */
+    public function run(array $seededUserIds = []): void
     {
         $publishedCertifications = Certification::query()
             ->where('status', CertificationStatus::Published->value)
@@ -51,13 +52,13 @@ final class EnrollmentSeeder extends Seeder
         }
 
         $fixedStudent = User::query()->where('email', 'student@certify-lms.test')->first();
-        // UserSeeder で投入される in_progress 受講生 demo の件数(8 件)に合わせて取得。
-        // 固定 student と面談残数 0 の固定 student は別ハンドリングするので whereNotIn で除外し、残り 8 件を循環パターンに割当てる。
+        // 今回作成した受講生だけをデモの候補にし、固定アカウントは別処理に任せる。
         $demoStudents = User::query()
+            ->whereKey($seededUserIds)
             ->where('role', UserRole::Student->value)
             ->where('status', UserStatus::InProgress->value)
             ->whereNotIn('email', ['student@certify-lms.test', 'student-noquota@certify-lms.test'])
-            ->limit(8)
+            ->orderBy('id')
             ->get();
 
         if ($fixedStudent === null && $demoStudents->isEmpty()) {
@@ -72,8 +73,9 @@ final class EnrollmentSeeder extends Seeder
             $this->enrollFixedStudent($fixedStudent, $publishedCertifications, $admin);
         }
 
-        $this->enrollDemoStudents($demoStudents, $publishedCertifications, $admin);
+        $demoEnrollmentIds = $this->enrollDemoStudents($demoStudents, $publishedCertifications, $admin);
         $this->enrollNoQuotaStudent($publishedCertifications);
+        $this->callWith(EnrollmentGoalSeeder::class, ['demoEnrollmentIds' => $demoEnrollmentIds]);
     }
 
     /**
@@ -118,7 +120,7 @@ final class EnrollmentSeeder extends Seeder
     }
 
     /**
-     * 固定 student に published 資格 4 件を learning で登録し、1 件目に個人目標 + 各件にコーチメモを添える。
+     * 固定 student に published 資格 4 件を learning で登録する。
      *
      * 4 件にするのは、ダッシュボードの合格可能性バンド(safe / warning / danger / データ不足)を 1 画面で
      * 網羅させるため(各 Enrollment の模試スコアは MockExamSeeder が帯ごとに作り分ける)。
@@ -160,9 +162,12 @@ final class EnrollmentSeeder extends Seeder
      *
      * @param Collection<int, User> $demoStudents
      * @param Collection<int, Certification> $publishedCerts
+     *
+     * @return list<string>
      */
-    private function enrollDemoStudents($demoStudents, $publishedCerts, ?User $admin): void
+    private function enrollDemoStudents($demoStudents, $publishedCerts, ?User $admin): array
     {
+        $enrollmentIds = [];
         $patterns = [
             ['state' => 'learning', 'examDays' => 60],
             ['state' => 'learning', 'examDays' => 14, 'mockPractice' => true],
@@ -205,7 +210,11 @@ final class EnrollmentSeeder extends Seeder
             if ($pattern['state'] === 'passed') {
                 $this->issueCertificate($enrollment, $passedAt);
             }
+
+            $enrollmentIds[] = $enrollment->id;
         }
+
+        return $enrollmentIds;
     }
 
     private function seedStatusLogs(Enrollment $enrollment, string $finalState, User $student): void
